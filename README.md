@@ -1,3 +1,4 @@
+
 # CAMPO LOGÍSTICA TARIJA DSS
 
 **Sistema de Soporte a Decisiones para la Gestión, Priorización y Optimización de Entregas en Tarija, Bolivia**
@@ -121,18 +122,8 @@ campo-logistica-tarija-dss/
     └── dashboard_dss.png
 ```
 
-## 11. Enlace de Figma
-
-**Prototipo editable:** `PEGAR_AQUI_EL_ENLACE_SHARE_DE_FIGMA`
-
-## 12. Repositorio GitHub
-
-**Repositorio:** `PEGAR_AQUI_EL_ENLACE_DEL_REPOSITORIO`
-
-Ejemplo de formato:
-
-`https://github.com/TU_USUARIO/campo-logistica-tarija-dss`
-
----
 
 Proyecto académico — Sistemas de Soporte a Decisiones (DSS), 2026.
+=======
+# CAMPOLOGISTICA-DSS
+
