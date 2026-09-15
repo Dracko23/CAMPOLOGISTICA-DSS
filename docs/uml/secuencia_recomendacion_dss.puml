@@ -1,0 +1,125 @@
+@startuml
+title CAMPO LOGÍSTICA TARIJA DSS\nSecuencia — Generación de Recomendación Logística
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam ArrowColor #475569
+
+skinparam sequence {
+  ActorBorderColor #1E3A5F
+  ActorFontColor #0F172A
+  LifeLineBorderColor #94A3B8
+  LifeLineBackgroundColor white
+  ParticipantBorderColor #2563EB
+  ParticipantBackgroundColor #EFF6FF
+  ParticipantFontColor #0F172A
+  GroupBorderColor #64748B
+  GroupBackgroundColor #F8FAFC
+}
+
+autonumber
+
+actor "Responsable\nLogístico" as Usuario
+boundary "Dashboard UI" as UI
+control "Controlador DSS" as API
+control "Motor DSS" as DSS
+database "Base de Datos" as BD
+
+Usuario -> UI : Selecciona pedido
+UI -> API : solicitarAnalisis(pedidoId)
+
+activate API
+
+API -> BD : consultarPedido(pedidoId)
+BD --> API : datosPedido
+
+alt Datos inválidos o incompletos
+
+    API --> UI : errorValidacion()
+    UI --> Usuario : Mostrar mensaje de corrección
+
+else Pedido válido
+
+    API -> BD : consultarRecursosDisponibles()
+    BD --> API : conductores + vehículos
+
+    API -> DSS : analizar(pedido, recursos)
+
+    activate DSS
+
+    DSS -> DSS : calcularPrioridad()
+
+    note right of DSS
+      HU-04
+      Urgencia + riesgo
+      + criterios ponderados
+    end note
+
+    loop Por cada alternativa
+        DSS -> DSS : validarRestricciones()
+        DSS -> DSS : estimarDistancia()
+        DSS -> DSS : estimarCombustible()
+        DSS -> DSS : calcularRiesgo()
+        DSS -> DSS : calcularPuntuacion()
+    end
+
+    note right of DSS
+      HU-08
+      Compara alternativas
+      factibles.
+    end note
+
+    alt No existe alternativa válida
+
+        DSS --> API : sinAlternativaFactible
+        deactivate DSS
+
+        API --> UI : mostrarAlerta()
+        UI --> Usuario : No existe asignación factible
+
+    else Existe alternativa válida
+
+        DSS -> DSS : seleccionarMejorAlternativa()
+        DSS -> DSS : generarExplicacion()
+
+        note right of DSS
+          HU-09
+          Recomendación
+          explicable.
+        end note
+
+        DSS --> API : recomendacion + alternativas
+        deactivate DSS
+
+        API -> BD : guardarEvaluacion()
+        BD --> API : OK
+
+        API --> UI : resultadoDSS()
+        deactivate API
+
+        UI --> Usuario : Mostrar ranking, km,\ncombustible, riesgo y recomendación
+
+        opt Responsable acepta recomendación
+
+            Usuario -> UI : Confirmar decisión
+            UI -> API : confirmarAsignacion()
+            activate API
+
+            API -> BD : registrarDecision()
+            BD --> API : OK
+
+            API --> UI : decisiónConfirmada()
+            deactivate API
+
+            UI --> Usuario : Mostrar confirmación
+
+        end
+
+    end
+
+end
+
+@enduml

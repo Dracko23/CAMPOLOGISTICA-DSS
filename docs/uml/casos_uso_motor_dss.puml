@@ -1,0 +1,70 @@
+@startuml
+title CAMPO LOGÍSTICA TARIJA DSS\nDiagrama de Casos de Uso — Motor de Decisión
+
+left to right direction
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowColor #475569
+skinparam ActorBorderColor #111418ff
+skinparam ActorFontColor #0F172A
+
+skinparam usecase {
+  BackgroundColor #F8FAFC
+  BorderColor #2563EB
+  FontColor #0F172A
+}
+
+skinparam rectangle {
+  BorderColor #94A3B8
+  FontColor #0F172A
+}
+
+actor "Responsable\nLogístico" as RL
+
+rectangle "Motor DSS" {
+
+  usecase "Consultar pedidos\npendientes" as UC1
+
+  usecase "Calcular prioridad\nde pedidos" as UC2
+
+  usecase "Comparar alternativas\nde asignación" as UC3
+
+  usecase "Validar disponibilidad\ny capacidad" as UC4
+
+  usecase "Estimar distancia,\ncombustible y riesgo" as UC5
+
+  usecase "Generar recomendación\nexplicable" as UC6
+
+  usecase "Confirmar decisión\nlogística" as UC7
+
+}
+
+RL --> UC1
+RL --> UC2
+RL --> UC3
+RL --> UC6
+RL --> UC7
+
+UC3 .> UC4 : <<include>>
+UC3 .> UC5 : <<include>>
+UC6 .> UC2 : <<include>>
+UC6 .> UC3 : <<include>>
+
+note right of UC6
+  HU-09
+  El sistema recomienda,
+  pero el responsable
+  toma la decisión final.
+end note
+
+legend bottom
+  HU-04 = Calcular prioridad
+  HU-08 = Comparar alternativas
+  HU-09 = Generar recomendación explicable
+endlegend
+
+@enduml

@@ -1,0 +1,142 @@
+@startuml
+title Diagrama de Clases - Motor DSS\nCAMPO LOGÍSTICA TARIJA DSS
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "Entidades Operacionales" {
+
+class Pedido {
+  -id: UUID
+  -codigo: String
+  -fechaRegistro: DateTime
+  -fechaLimite: DateTime
+  -estado: EstadoPedido
+  -criticidad: Integer
+  -pesoKg: Decimal
+  +actualizarEstado()
+}
+
+class Cliente {
+  -id: UUID
+  -nombre: String
+  -telefono: String
+}
+
+class Ubicacion {
+  -id: UUID
+  -direccion: String
+  -zona: String
+  -latitud: Decimal
+  -longitud: Decimal
+}
+
+class Conductor {
+  -id: UUID
+  -nombre: String
+  -disponible: Boolean
+  +estaDisponible(): Boolean
+}
+
+class Vehiculo {
+  -id: UUID
+  -placa: String
+  -capacidadKg: Decimal
+  -consumoKmLitro: Decimal
+  -disponible: Boolean
+  +validarCapacidad(peso: Decimal): Boolean
+}
+
+}
+
+package "Motor DSS" {
+
+class CriterioDecision {
+  -id: UUID
+  -nombre: String
+  -peso: Decimal
+  -valorNormalizado: Decimal
+  +normalizar(): Decimal
+}
+
+class AlternativaAsignacion {
+  -id: UUID
+  -distanciaKm: Decimal
+  -combustibleLitros: Decimal
+  -riesgoRetraso: Decimal
+  -puntuacion: Decimal
+  -valida: Boolean
+  +calcularPuntuacion(): Decimal
+  +validarRestricciones(): Boolean
+}
+
+class EvaluacionDSS {
+  -id: UUID
+  -fecha: DateTime
+  -indicePrioridad: Decimal
+  -nivelPrioridad: String
+  +calcularPrioridad(): Decimal
+  +compararAlternativas()
+}
+
+class RecomendacionDSS {
+  -id: UUID
+  -puntuacionFinal: Decimal
+  -explicacion: String
+  -impactoKm: Decimal
+  -impactoCombustible: Decimal
+  -impactoRiesgo: Decimal
+  +generarExplicacion(): String
+}
+
+}
+
+package "Trazabilidad" {
+
+class HistorialDecision {
+  -id: UUID
+  -fecha: DateTime
+  -usuario: String
+  -decisionTomada: String
+  -alternativaSeleccionada: UUID
+  +registrarDecision()
+}
+
+}
+
+Cliente "1" -- "0..*" Pedido
+Pedido "1" *-- "1" Ubicacion
+
+Pedido "1" -- "0..*" EvaluacionDSS
+
+EvaluacionDSS "1" *-- "1..*" CriterioDecision
+EvaluacionDSS "1" *-- "2..*" AlternativaAsignacion
+
+AlternativaAsignacion "*" --> "1" Conductor
+AlternativaAsignacion "*" --> "1" Vehiculo
+
+EvaluacionDSS "1" --> "0..1" RecomendacionDSS
+RecomendacionDSS "1" --> "1" AlternativaAsignacion
+
+RecomendacionDSS "1" --> "0..1" HistorialDecision
+
+note right of EvaluacionDSS
+HU-04:
+Calcula prioridad
+y evalúa criterios.
+end note
+
+note right of AlternativaAsignacion
+HU-08:
+Compara alternativas,
+distancia, combustible
+y riesgo.
+end note
+
+note right of RecomendacionDSS
+HU-09:
+Genera una recomendación
+explicable.
+end note
+
+@enduml
