@@ -266,4 +266,41 @@ CAMPOLOGISTICA-DSS/
 
 ---
 
-**Proyecto académico — Sistemas de Soporte a Decisiones (DSS), 2026.**
+## Arquitectura Dual: OLTP + Data Warehouse
+
+CAMPO LOGÍSTICA TARIJA DSS utiliza una arquitectura dual que separa el procesamiento operacional del procesamiento analítico.
+
+El modelo **OLTP** está orientado a las operaciones CRUD diarias y mantiene los datos normalizados para reducir redundancia y proteger la integridad. El **Data Warehouse** utiliza un Esquema en Estrella optimizado para consultas analíticas, indicadores históricos y soporte a decisiones.
+
+### Modelo OLTP — PostgreSQL
+
+El modelo transaccional transforma las entidades definidas en UML en tablas relacionales mediante reglas ORM. Se utilizan claves primarias, claves foráneas y restricciones `UNIQUE`, `NOT NULL` y `CHECK` para mantener la integridad de los datos.
+
+![Modelo OLTP](docs/database/modelo_oltp.png)
+
+**Fuente PlantUML:** [`modelo_oltp.puml`](docs/database/modelo_oltp.puml)
+
+### Data Warehouse — Esquema en Estrella
+
+El modelo analítico utiliza `FACT_ENTREGA` como tabla de hechos central y las dimensiones Tiempo, Cliente, Conductor, Vehículo y Ubicación.
+
+La granularidad establecida es:
+
+> **Cada fila de FACT_ENTREGA representa una entrega individual ejecutada correspondiente a un pedido y su asignación logística.**
+
+![Data Warehouse](docs/database/modelo_dw_estrella.png)
+
+**Fuente PlantUML:** [`modelo_dw_estrella.puml`](docs/database/modelo_dw_estrella.puml)
+
+### KPIs analíticos
+
+1. Porcentaje de entregas tardías por período, zona, conductor y vehículo.
+2. Kilómetros totales y promedio por entrega.
+3. Litros consumidos y costo estimado de combustible.
+
+### Flujo de información
+
+`CRUD → PostgreSQL OLTP → ETL → Data Warehouse → Dashboard DSS → Responsable Logístico`
+
+El OLTP registra la operación diaria, mientras que el Data Warehouse conserva información preparada para análisis histórico y agregaciones. El DSS utiliza estos datos como soporte analítico, manteniendo la decisión final bajo responsabilidad del usuario.
+

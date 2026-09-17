@@ -1,0 +1,133 @@
+@startuml
+title CAMPO LOGÍSTICA TARIJA DSS\nModelo Relacional OLTP — PostgreSQL
+
+left to right direction
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam ArrowColor #64748B
+
+entity "CLIENTE" as cliente {
+  * id_cliente : BIGSERIAL <<PK>>
+  --
+  nombre : VARCHAR(120) <<NOT NULL>>
+  telefono : VARCHAR(30)
+  email : VARCHAR(150)
+}
+
+entity "UBICACION" as ubicacion {
+  * id_ubicacion : BIGSERIAL <<PK>>
+  --
+  direccion : VARCHAR(200) <<NOT NULL>>
+  zona : VARCHAR(80) <<NOT NULL>>
+  latitud : NUMERIC(9,6)
+  longitud : NUMERIC(9,6)
+}
+
+entity "PEDIDO" as pedido {
+  * id_pedido : BIGSERIAL <<PK>>
+  --
+  id_cliente : BIGINT <<FK>>
+  id_ubicacion : BIGINT <<FK>>
+  codigo : VARCHAR(30) <<UNIQUE>>
+  fecha_registro : TIMESTAMP <<NOT NULL>>
+  fecha_limite : TIMESTAMP <<NOT NULL>>
+  peso_kg : NUMERIC(10,2) <<CHECK > 0>>
+  urgencia : SMALLINT <<CHECK 1..5>>
+  estado : VARCHAR(30) <<NOT NULL>>
+}
+
+entity "CONDUCTOR" as conductor {
+  * id_conductor : BIGSERIAL <<PK>>
+  --
+  nombre : VARCHAR(120) <<NOT NULL>>
+  licencia : VARCHAR(40) <<UNIQUE>>
+  disponible : BOOLEAN <<NOT NULL>>
+}
+
+entity "VEHICULO" as vehiculo {
+  * id_vehiculo : BIGSERIAL <<PK>>
+  --
+  placa : VARCHAR(20) <<UNIQUE>>
+  capacidad_kg : NUMERIC(10,2) <<CHECK > 0>>
+  rendimiento_km_l : NUMERIC(8,2) <<CHECK > 0>>
+  disponible : BOOLEAN <<NOT NULL>>
+}
+
+entity "ASIGNACION" as asignacion {
+  * id_asignacion : BIGSERIAL <<PK>>
+  --
+  id_pedido : BIGINT <<FK>>
+  id_conductor : BIGINT <<FK>>
+  id_vehiculo : BIGINT <<FK>>
+  fecha_asignacion : TIMESTAMP <<NOT NULL>>
+  fecha_salida : TIMESTAMP
+  fecha_entrega : TIMESTAMP
+  distancia_km : NUMERIC(10,2) <<CHECK >= 0>>
+  combustible_litros : NUMERIC(10,2) <<CHECK >= 0>>
+  costo_combustible : NUMERIC(12,2) <<CHECK >= 0>>
+  estado : VARCHAR(30) <<NOT NULL>>
+}
+
+entity "EVALUACION_DSS" as evaluacion {
+  * id_evaluacion : BIGSERIAL <<PK>>
+  --
+  id_pedido : BIGINT <<FK>>
+  fecha_evaluacion : TIMESTAMP <<NOT NULL>>
+  indice_prioridad : NUMERIC(5,2) <<CHECK 0..100>>
+}
+
+entity "ALTERNATIVA" as alternativa {
+  * id_alternativa : BIGSERIAL <<PK>>
+  --
+  id_evaluacion : BIGINT <<FK>>
+  id_conductor : BIGINT <<FK>>
+  id_vehiculo : BIGINT <<FK>>
+  distancia_estimada_km : NUMERIC(10,2)
+  combustible_estimado_l : NUMERIC(10,2)
+  riesgo_retraso : NUMERIC(5,2)
+  puntuacion : NUMERIC(5,2)
+  valida : BOOLEAN
+  recomendada : BOOLEAN
+}
+
+cliente ||--o{ pedido : realiza
+ubicacion ||--o{ pedido : destino
+
+pedido ||--o{ asignacion : recibe
+conductor ||--o{ asignacion : ejecuta
+vehiculo ||--o{ asignacion : utiliza
+
+pedido ||--o{ evaluacion : analiza
+evaluacion ||--|{ alternativa : genera
+
+conductor ||--o{ alternativa : candidato
+vehiculo ||--o{ alternativa : candidato
+
+note bottom of pedido
+Modelo normalizado para
+operaciones CRUD.
+end note
+
+note bottom of evaluacion
+HU-04:
+priorización DSS.
+end note
+
+note bottom of alternativa
+HU-08 / HU-09:
+comparación y recomendación.
+end note
+
+legend bottom
+PK = Primary Key
+FK = Foreign Key
+UNIQUE = evita duplicados
+CHECK = protege integridad
+endlegend
+
+@enduml
