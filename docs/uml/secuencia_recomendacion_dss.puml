@@ -53,13 +53,21 @@ else Pedido válido
     DSS -> DSS : calcularPrioridad()
 
     note right of DSS
-      HU-04
-      Urgencia + riesgo
-      + criterios ponderados
+      HU-04: Prioridad (0-100)
+      Pesos base: Urgencia (30%),
+      Riesgo (25%), Distancia (20%),
+      Combustible (15%), Recursos (10%)
     end note
 
     loop Por cada alternativa
-        DSS -> DSS : validarRestricciones()
+        DSS -> DSS : validarRestriccionesDuras()
+        note right of DSS
+          Excluye alternativa si:
+          - Conductor no disponible
+          - Vehículo no disponible
+          - Capacidad < Peso pedido
+          - Pedido no asignable
+        end note
         DSS -> DSS : estimarDistancia()
         DSS -> DSS : estimarCombustible()
         DSS -> DSS : calcularRiesgo()
@@ -69,7 +77,7 @@ else Pedido válido
     note right of DSS
       HU-08
       Compara alternativas
-      factibles.
+      factibles no excluidas.
     end note
 
     alt No existe alternativa válida

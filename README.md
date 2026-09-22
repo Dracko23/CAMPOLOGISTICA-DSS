@@ -255,32 +255,32 @@ CAMPOLOGISTICA-DSS/
 
 ---
 
-## Tecnologías y herramientas
+## Tecnologías y herramientas autorizadas
 
-* PlantUML
-* Git
-* GitHub
-* Figma
-* Draw.io
-* Visual Studio Code
+* **Frontend Target (Futuro):** React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Lucide React, Apache ECharts, React-Leaflet.
+* **Backend Target (Futuro):** Python, FastAPI, SQLAlchemy, Pydantic, Alembic, pytest.
+* **Base de datos Target:** PostgreSQL 16 (Esquemas `oltp` y `dw`).
+* **Documentación & Modelado:** PlantUML (Docs as Code), Git, GitHub.
 
 ---
 
 ## Arquitectura Dual: OLTP + Data Warehouse
 
-CAMPO LOGÍSTICA TARIJA DSS utiliza una arquitectura dual que separa el procesamiento operacional del procesamiento analítico.
+CAMPO LOGÍSTICA TARIJA DSS utiliza una arquitectura dual que separa el procesamiento operacional del procesamiento analítico mediante dos esquemas relacionales independientes en PostgreSQL: `oltp` y `dw`.
 
-El modelo **OLTP** está orientado a las operaciones CRUD diarias y mantiene los datos normalizados para reducir redundancia y proteger la integridad. El **Data Warehouse** utiliza un Esquema en Estrella optimizado para consultas analíticas, indicadores históricos y soporte a decisiones.
+El esquema **`oltp`** está orientado a las operaciones CRUD diarias y mantiene los datos normalizados para reducir redundancia y proteger la integridad relacional (PK autogeneradas con `BIGSERIAL`, FK con `BIGINT`, atributos de pedidos `urgencia` SMALLINT 1..5 y vehículos `rendimiento_km_l`).
 
-### Modelo OLTP — PostgreSQL
+El esquema **`dw`** utiliza un Esquema en Estrella (Star Schema) compuesto por `FACT_ENTREGA` y las dimensiones `DIM_TIEMPO`, `DIM_CLIENTE`, `DIM_CONDUCTOR`, `DIM_VEHICULO` y `DIM_UBICACION` con surrogate keys (`sk_*`), optimizado para consultas analíticas e indicadores históricos.
 
-El modelo transaccional transforma las entidades definidas en UML en tablas relacionales mediante reglas ORM. Se utilizan claves primarias, claves foráneas y restricciones `UNIQUE`, `NOT NULL` y `CHECK` para mantener la integridad de los datos.
+### Modelo OLTP — PostgreSQL (esquema `oltp`)
+
+El modelo transaccional transforma las entidades definidas en UML en tablas relacionales mediante reglas ORM. Se utilizan claves primarias (`BIGSERIAL`), claves foráneas (`BIGINT`) y restricciones `UNIQUE`, `NOT NULL` y `CHECK` para mantener la integridad de los datos.
 
 ![Modelo OLTP](docs/database/modelo_oltp.png)
 
 **Fuente PlantUML:** [`modelo_oltp.puml`](docs/database/modelo_oltp.puml)
 
-### Data Warehouse — Esquema en Estrella
+### Data Warehouse — Esquema en Estrella (esquema `dw`)
 
 El modelo analítico utiliza `FACT_ENTREGA` como tabla de hechos central y las dimensiones Tiempo, Cliente, Conductor, Vehículo y Ubicación.
 
@@ -288,19 +288,32 @@ La granularidad establecida es:
 
 > **Cada fila de FACT_ENTREGA representa una entrega individual ejecutada correspondiente a un pedido y su asignación logística.**
 
+Métricas de `FACT_ENTREGA`: `cantidad_entregas` (=1), `distancia_km`, `combustible_litros`, `costo_combustible`, `minutos_retraso`, `entrega_tardia`, `entrega_a_tiempo`.
+
 ![Data Warehouse](docs/database/modelo_dw_estrella.png)
 
 **Fuente PlantUML:** [`modelo_dw_estrella.puml`](docs/database/modelo_dw_estrella.puml)
 
-### KPIs analíticos
+### Configuración del Motor DSS
 
-1. Porcentaje de entregas tardías por período, zona, conductor y vehículo.
-2. Kilómetros totales y promedio por entrega.
-3. Litros consumidos y costo estimado de combustible.
+El Motor DSS evalúa prioridades y recomendaciones utilizando una ponderación base congelada (Total 100%, escala 0-100):
+* **Urgencia:** 30%
+* **Riesgo de retraso:** 25%
+* **Eficiencia de distancia:** 20%
+* **Eficiencia de combustible:** 15%
+* **Disponibilidad/capacidad de recursos:** 10%
 
-### Flujo de información
+**Restricciones duras:** Se evalúan antes del ranking. Si un conductor no está disponible, un vehículo no está disponible, la capacidad es insuficiente o el pedido no es asignable, la alternativa se **excluye** del ranking.
 
-`CRUD → PostgreSQL OLTP → ETL → Data Warehouse → Dashboard DSS → Responsable Logístico`
+### Flujos de Información
 
-El OLTP registra la operación diaria, mientras que el Data Warehouse conserva información preparada para análisis histórico y agregaciones. El DSS utiliza estos datos como soporte analítico, manteniendo la decisión final bajo responsabilidad del usuario.
+La arquitectura comprende dos flujos diferenciados:
+
+1. **Flujo Operacional DSS:**
+   `PostgreSQL OLTP (esquema oltp) → Motor DSS → Prioridad / Riesgo / Recomendación → Dashboard DSS → Responsable Logístico → DECISIÓN HUMANA`
+
+2. **Flujo Analítico:**
+   `PostgreSQL OLTP (esquema oltp) → ETL → Data Warehouse (esquema dw) → KPIs / Histórico → Dashboard DSS → Responsable Logístico`
+
+El OLTP registra la operación diaria y alimenta directamente al Motor DSS para soporte operacional, mientras que el Data Warehouse conserva información e indicadores analíticos históricos procesados por el ETL. En todos los casos, **la decisión final permanece bajo la responsabilidad del Responsable Logístico**.
 

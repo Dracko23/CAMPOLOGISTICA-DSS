@@ -1,0 +1,108 @@
+@startuml
+title CAMPO LOGÍSTICA TARIJA DSS\nModelo Analítico Data Warehouse — Esquema en Estrella (esquema dw)
+
+left to right direction
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam ArrowColor #64748B
+
+package "Esquema dw (Data Warehouse)" {
+
+entity "DIM_TIEMPO" as dim_tiempo {
+  * sk_tiempo : BIGSERIAL <<PK>>
+  --
+  fecha : DATE <<NOT NULL, UNIQUE>>
+  anio : INTEGER <<NOT NULL>>
+  mes : INTEGER <<NOT NULL>>
+  nombre_mes : VARCHAR(20) <<NOT NULL>>
+  dia : INTEGER <<NOT NULL>>
+  dia_semana : VARCHAR(20) <<NOT NULL>>
+  trimestre : INTEGER <<NOT NULL>>
+  es_fin_semana : BOOLEAN <<NOT NULL>>
+}
+
+entity "DIM_CLIENTE" as dim_cliente {
+  * sk_cliente : BIGSERIAL <<PK>>
+  --
+  id_cliente_oltp : BIGINT <<NOT NULL>>
+  nombre : VARCHAR(120) <<NOT NULL>>
+  telefono : VARCHAR(30)
+  email : VARCHAR(150)
+}
+
+entity "DIM_CONDUCTOR" as dim_conductor {
+  * sk_conductor : BIGSERIAL <<PK>>
+  --
+  id_conductor_oltp : BIGINT <<NOT NULL>>
+  nombre : VARCHAR(120) <<NOT NULL>>
+  licencia : VARCHAR(40) <<NOT NULL>>
+}
+
+entity "DIM_VEHICULO" as dim_vehiculo {
+  * sk_vehiculo : BIGSERIAL <<PK>>
+  --
+  id_vehiculo_oltp : BIGINT <<NOT NULL>>
+  placa : VARCHAR(20) <<NOT NULL>>
+  capacidad_kg : NUMERIC(10,2) <<NOT NULL>>
+  rendimiento_km_l : NUMERIC(8,2) <<NOT NULL>>
+}
+
+entity "DIM_UBICACION" as dim_ubicacion {
+  * sk_ubicacion : BIGSERIAL <<PK>>
+  --
+  id_ubicacion_oltp : BIGINT <<NOT NULL>>
+  direccion : VARCHAR(200) <<NOT NULL>>
+  zona : VARCHAR(80) <<NOT NULL>>
+  ciudad : VARCHAR(80) <<NOT NULL>>
+  departamento : VARCHAR(80) <<NOT NULL>>
+}
+
+entity "FACT_ENTREGA" as fact_entrega {
+  * sk_fact_entrega : BIGSERIAL <<PK>>
+  --
+  * sk_tiempo : BIGINT <<FK>>
+  * sk_cliente : BIGINT <<FK>>
+  * sk_conductor : BIGINT <<FK>>
+  * sk_vehiculo : BIGINT <<FK>>
+  * sk_ubicacion : BIGINT <<FK>>
+  --
+  id_asignacion_oltp : BIGINT <<NOT NULL>>
+  id_pedido_oltp : BIGINT <<NOT NULL>>
+  --
+  cantidad_entregas : BIGINT <<NOT NULL, CHECK = 1>>
+  distancia_km : NUMERIC(10,2) <<NOT NULL, CHECK >= 0>>
+  combustible_litros : NUMERIC(10,2) <<NOT NULL, CHECK >= 0>>
+  costo_combustible : NUMERIC(12,2) <<NOT NULL, CHECK >= 0>>
+  minutos_retraso : INTEGER <<NOT NULL>>
+  entrega_tardia : BOOLEAN <<NOT NULL>>
+  entrega_a_tiempo : BOOLEAN <<NOT NULL>>
+}
+
+}
+
+dim_tiempo ||--o{ fact_entrega : "dimensiona"
+dim_cliente ||--o{ fact_entrega : "dimensiona"
+dim_conductor ||--o{ fact_entrega : "dimensiona"
+dim_vehiculo ||--o{ fact_entrega : "dimensiona"
+dim_ubicacion ||--o{ fact_entrega : "dimensiona"
+
+note bottom of fact_entrega
+Granularidad:
+Cada fila de FACT_ENTREGA representa una entrega
+individual ejecutada correspondiente a un pedido
+y su asignación logística.
+end note
+
+legend bottom
+PK = Primary Key (Surrogate Key sk_*)
+FK = Foreign Key
+Esquema: dw
+oltp_* = Trazabilidad al origen OLTP
+endlegend
+
+@enduml

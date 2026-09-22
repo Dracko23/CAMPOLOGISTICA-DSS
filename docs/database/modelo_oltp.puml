@@ -1,5 +1,5 @@
 @startuml
-title CAMPO LOGÍSTICA TARIJA DSS\nModelo Relacional OLTP — PostgreSQL
+title CAMPO LOGÍSTICA TARIJA DSS\nModelo Relacional OLTP — PostgreSQL (Esquema oltp)
 
 left to right direction
 
@@ -10,6 +10,8 @@ skinparam defaultFontName Arial
 skinparam defaultFontSize 11
 skinparam linetype ortho
 skinparam ArrowColor #64748B
+
+package "Esquema oltp (Transaccional PostgreSQL)" {
 
 entity "CLIENTE" as cliente {
   * id_cliente : BIGSERIAL <<PK>>
@@ -93,6 +95,8 @@ entity "ALTERNATIVA" as alternativa {
   puntuacion : NUMERIC(5,2)
   valida : BOOLEAN
   recomendada : BOOLEAN
+}
+
 }
 
 cliente ||--o{ pedido : realiza

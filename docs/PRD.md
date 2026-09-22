@@ -30,11 +30,12 @@ Estas reglas constituyen fronteras obligatorias para desarrolladores humanos y a
 
 * **NO** eliminar, renombrar o modificar tablas, columnas, PK, FK o restricciones existentes sin una modificación explícita y aprobada del modelo de datos.
 * **NO** mezclar las responsabilidades del esquema transaccional `oltp` con las del esquema analítico `dw`.
+* **NO** utilizar `UUID` en el MVP. El modelo físico PostgreSQL utilizará `BIGSERIAL` para PK autogeneradas y `BIGINT` para FK.
 * **NO** escribir directamente en `dw.fact_entrega` desde operaciones CRUD; los datos analíticos deben ingresar mediante el proceso ETL definido.
 * **NO** cargar en `FACT_ENTREGA` asignaciones canceladas, entregas no finalizadas o registros que no superen las reglas de calidad ETL.
-* **NO** almacenar texto descriptivo operacional innecesario dentro de `FACT_ENTREGA`; la tabla debe concentrar claves y métricas cuantitativas.
-* **NO** modificar silenciosamente los pesos, criterios o restricciones del Motor DSS.
-* **NO** recomendar alternativas que incumplan disponibilidad del conductor, disponibilidad del vehículo, capacidad requerida o condiciones válidas del pedido.
+* **NO** almacenar texto descriptivo operacional innecesario dentro de `FACT_ENTREGA`; la tabla debe concentrar claves subrogadas (`sk_*`), claves de origen y métricas cuantitativas.
+* **NO** modificar silenciosamente los pesos, criterios o restricciones del Motor DSS (pesos base congelados: Urgencia 30%, Riesgo 25%, Distancia 20%, Combustible 15%, Disponibilidad/Capacidad 10%, Total 100%).
+* **NO** incluir en el ranking alternativas que incumplan restricciones duras (disponibilidad de conductor/vehículo, capacidad de carga suficiente o estado asignable del pedido); deben ser excluidas antes del cálculo de puntuación.
 * **NO** presentar datos estimados como resultados reales.
 * **NO** afirmar que los objetivos de reducción de kilómetros, combustible, errores o retrasos fueron alcanzados mientras no exista evidencia de medición.
 * **NO** permitir que una recomendación del DSS ejecute automáticamente la decisión final sin confirmación del Responsable Logístico.
@@ -161,25 +162,56 @@ Gestionar los recursos que pueden participar en una asignación.
 
 # 4. Módulo 2: Requerimientos Analíticos (DSS / OLAP)
 
-## 4.1 Integración ETL
+## 4.1 Integración ETL y Data Warehouse (`dw`)
 
-Los datos operacionales almacenados en PostgreSQL OLTP serán extraídos, validados y transformados antes de cargarse en el esquema analítico `dw`.
+Los datos operacionales almacenados en PostgreSQL OLTP (esquema `oltp`) serán extraídos, validados y transformados antes de cargarse en el esquema analítico `dw` mediante un Esquema en Estrella (Star Schema).
+
+El esquema `dw` estará compuesto por:
+* **Tabla de hechos:** `FACT_ENTREGA` (`dw.fact_entrega`)
+* **Dimensiones:** `DIM_TIEMPO`, `DIM_CLIENTE`, `DIM_CONDUCTOR`, `DIM_VEHICULO`, `DIM_UBICACION` (`dw.dim_*`)
+
+Todas las dimensiones utilizarán claves subrogadas (`sk_*`) de tipo `BIGSERIAL`/`BIGINT` y mantendrán campos de origen (`id_*_oltp`) para garantizar la trazabilidad operacional.
+
+La granularidad de `FACT_ENTREGA` es estrictamente:
+
+> **Cada fila de FACT_ENTREGA representa una entrega individual ejecutada correspondiente a un pedido y su asignación logística.**
+
+Las métricas cuantitativas obligatorias de `FACT_ENTREGA` son:
+* `cantidad_entregas` (BIGINT, fijo = 1 por fila debido a la granularidad)
+* `distancia_km` (NUMERIC(10,2))
+* `combustible_litros` (NUMERIC(10,2))
+* `costo_combustible` (NUMERIC(12,2))
+* `minutos_retraso` (INTEGER)
+* `entrega_tardia` (BOOLEAN)
+* `entrega_a_tiempo` (BOOLEAN)
 
 El proceso ETL deberá:
-
 1. Construir `DIM_TIEMPO` a partir de las fechas de entrega.
-2. Comparar `fecha_entrega` con `fecha_limite` para determinar retrasos.
+2. Comparar `fecha_entrega` con `fecha_limite` para determinar `minutos_retraso` y `entrega_tardia`.
 3. Validar que distancia, combustible y costo no contengan valores negativos.
 4. Integrar ubicación operacional en atributos analíticos de zona, ciudad y departamento.
 5. Excluir asignaciones canceladas, entregas no finalizadas y registros que no superen las reglas de calidad.
 
-La granularidad de `FACT_ENTREGA` será:
-
-> **Cada fila de FACT_ENTREGA representa una entrega individual ejecutada correspondiente a un pedido y su asignación logística.**
-
 ---
 
 ## 4.2 Épica E-05 — Análisis de Prioridad y Riesgo
+
+### Ponderación Base del Motor DSS
+El Motor DSS opera con la siguiente ponderación base fija (Total 100%, escala normalizada 0 a 100):
+* **Urgencia:** 30%
+* **Riesgo de retraso:** 25%
+* **Eficiencia de distancia:** 20%
+* **Eficiencia de combustible:** 15%
+* **Disponibilidad/capacidad de recursos:** 10%
+
+### Restricciones Duras (Exclusión previa al ranking)
+Antes de calcular la puntuación y generar el ranking, el motor evalúa las siguientes restricciones duras:
+1. Conductor disponible.
+2. Vehículo disponible.
+3. Capacidad del vehículo suficiente (`capacidad_kg >= peso_kg`).
+4. Pedido en estado asignable.
+
+**Regla de exclusión:** Toda alternativa que incumpla al menos una restricción dura debe ser **EXCLUIDA** inmediatamente antes de la fase de ranking (no recibe simplemente una menor puntuación).
 
 ### HU-DSS-01 — Consultar prioridad de pedidos
 
@@ -190,7 +222,7 @@ La granularidad de `FACT_ENTREGA` será:
 **Criterios de aceptación:**
 
 * El índice debe encontrarse entre 0 y 100.
-* El cálculo debe considerar únicamente los criterios configurados para el Motor DSS.
+* El cálculo debe considerar los criterios y pesos base configurados para el Motor DSS.
 * Con los mismos datos y los mismos pesos, el resultado debe ser determinista.
 * El sistema debe mostrar los criterios que influyeron en la puntuación.
 
@@ -219,8 +251,8 @@ La granularidad de `FACT_ENTREGA` será:
 
 **Criterios de aceptación:**
 
-* Cada alternativa debe mostrar puntuación, distancia estimada, combustible estimado y riesgo de retraso.
-* Deben excluirse alternativas que incumplan disponibilidad o capacidad.
+* Cada alternativa debe mostrar puntuación (0-100), distancia estimada, combustible estimado y riesgo de retraso.
+* Deben ser excluidas antes del ranking las alternativas que incumplan restricciones duras (disponibilidad o capacidad).
 * Las alternativas deben utilizar los mismos criterios y pesos dentro de una misma evaluación.
 * El sistema debe conservar la trazabilidad de la evaluación.
 
@@ -232,11 +264,11 @@ La granularidad de `FACT_ENTREGA` será:
 
 **Criterios de aceptación:**
 
-* El sistema debe identificar la alternativa recomendada.
+* El sistema debe identificar la alternativa recomendada de mayor puntuación.
 * Debe mostrar su puntuación.
-* Debe indicar los criterios con mayor influencia.
+* Debe indicar los criterios con mayor influencia (ej. Urgencia 30%, Riesgo 25%, etc.).
 * Debe mostrar diferencias relevantes frente a las demás alternativas.
-* La recomendación no debe ejecutar automáticamente la asignación.
+* La recomendación no debe ejecutar automáticamente la asignación; la decisión final permanece estrictamente bajo responsabilidad del Responsable Logístico.
 
 ---
 
@@ -405,15 +437,67 @@ Una funcionalidad será considerada terminada únicamente cuando:
                     +-----------------------+
 ```
 
-## 7.1 Flujo analítico simplificado
+## 7.1 Flujos de Información
 
+La arquitectura del sistema opera mediante **DOS FLUJOS RELACIONADOS PERO DISTINTOS**:
+
+### 1. FLUJO OPERACIONAL DSS (Soporte en tiempo real)
 ```text
-[PostgreSQL OLTP] --> [ETL] --> [Data Warehouse / OLAP]
-                              --> [KPIs / Dashboard]
-                              --> [Responsable Logístico]
+PostgreSQL OLTP (esquema oltp)
+        ↓
+    Motor DSS
+        ↓
+Prioridad / Riesgo / Alternativas / Recomendación
+        ↓
+  Dashboard DSS
+        ↓
+Responsable Logístico
+        ↓
+ DECISIÓN HUMANA
 ```
 
-El OLTP constituye la fuente operacional; ETL limpia, valida e integra los datos; el Data Warehouse conserva información preparada para análisis histórico y agregaciones; y el Motor DSS complementa esta arquitectura mediante evaluación de prioridad, riesgo y alternativas. La información resultante apoya al Responsable Logístico sin reemplazar su decisión.
+### 2. FLUJO ANALÍTICO (Análisis histórico y KPIs)
+```text
+PostgreSQL OLTP (esquema oltp)
+        ↓
+       ETL
+        ↓
+Data Warehouse (esquema dw: STAR SCHEMA)
+        ↓
+ KPIs / Histórico / OLAP
+        ↓
+  Dashboard DSS
+        ↓
+Responsable Logístico
+```
+
+El Data Warehouse NO reemplaza al Motor DSS operacional. El Motor DSS opera directamente con los datos operacionales de `oltp` para priorizar y recomendar alternativas. El Data Warehouse permite el análisis de tendencias y KPIs analíticos históricos. La decisión final SIEMPRE corresponde al Responsable Logístico.
+
+---
+
+## 7.2 Especificación UI/UX Objetivo (Preservada para futuros incrementos)
+
+El diseño de la interfaz objetivo seguirá los patrones de una plataforma SaaS logística moderna, intuitiva y de baja carga cognitiva.
+
+### Stack Frontend Autorizado:
+* **Core:** React, Vite, TypeScript
+* **Estilos & UI:** Tailwind CSS, shadcn/ui, Lucide React
+* **Visualización & Mapas:** Apache ECharts, React-Leaflet
+
+### Componentes del Dashboard DSS:
+* Sidebar moderna y colapsable con navegación responsive.
+* Tarjetas KPI con tendencias de rendimiento y variaciones porcentaje.
+* Filtros dinámicos por período, zona, conductor y vehículo.
+* Badges de estado funcional (rojo/verde reserved para alertas/riesgos).
+* Ranking interactivo de pedidos priorizados.
+* Indicadores visuales de riesgo de retraso.
+* Panel explicativo de recomendaciones DSS.
+* Mapa de entregas urbanas en Tarija (React-Leaflet).
+* Gráficos analíticos de distancia y combustible (ECharts).
+* Tablas modernas con paginación, filtros y búsqueda.
+* Drawers/Dialogs para drill-down de detalles sin perder contexto.
+* Tooltips, Toasts de notificación y Skeleton Loading para estados de carga.
+* Módulo What-If interactivo con sliders/controles para simular escenarios sin alterar la configuración operacional base.
 
 ---
 

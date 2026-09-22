@@ -4,27 +4,27 @@ title Diagrama de Clases - Motor DSS\nCAMPO LOGÍSTICA TARIJA DSS
 skinparam shadowing false
 skinparam classAttributeIconSize 0
 
-package "Entidades Operacionales" {
+package "Esquema oltp - Entidades Operacionales" {
 
 class Pedido {
-  -id: UUID
+  -id: Long
   -codigo: String
   -fechaRegistro: DateTime
   -fechaLimite: DateTime
   -estado: EstadoPedido
-  -criticidad: Integer
+  -urgencia: SmallInt
   -pesoKg: Decimal
   +actualizarEstado()
 }
 
 class Cliente {
-  -id: UUID
+  -id: Long
   -nombre: String
   -telefono: String
 }
 
 class Ubicacion {
-  -id: UUID
+  -id: Long
   -direccion: String
   -zona: String
   -latitud: Decimal
@@ -32,27 +32,27 @@ class Ubicacion {
 }
 
 class Conductor {
-  -id: UUID
+  -id: Long
   -nombre: String
   -disponible: Boolean
   +estaDisponible(): Boolean
 }
 
 class Vehiculo {
-  -id: UUID
+  -id: Long
   -placa: String
   -capacidadKg: Decimal
-  -consumoKmLitro: Decimal
+  -rendimientoKmLitro: Decimal
   -disponible: Boolean
   +validarCapacidad(peso: Decimal): Boolean
 }
 
 }
 
-package "Motor DSS" {
+package "Esquema oltp - Motor DSS" {
 
 class CriterioDecision {
-  -id: UUID
+  -id: Long
   -nombre: String
   -peso: Decimal
   -valorNormalizado: Decimal
@@ -60,18 +60,18 @@ class CriterioDecision {
 }
 
 class AlternativaAsignacion {
-  -id: UUID
+  -id: Long
   -distanciaKm: Decimal
   -combustibleLitros: Decimal
   -riesgoRetraso: Decimal
   -puntuacion: Decimal
   -valida: Boolean
   +calcularPuntuacion(): Decimal
-  +validarRestricciones(): Boolean
+  +validarRestriccionesDuras(): Boolean
 }
 
 class EvaluacionDSS {
-  -id: UUID
+  -id: Long
   -fecha: DateTime
   -indicePrioridad: Decimal
   -nivelPrioridad: String
@@ -80,7 +80,7 @@ class EvaluacionDSS {
 }
 
 class RecomendacionDSS {
-  -id: UUID
+  -id: Long
   -puntuacionFinal: Decimal
   -explicacion: String
   -impactoKm: Decimal
@@ -91,14 +91,14 @@ class RecomendacionDSS {
 
 }
 
-package "Trazabilidad" {
+package "Esquema oltp - Trazabilidad" {
 
 class HistorialDecision {
-  -id: UUID
+  -id: Long
   -fecha: DateTime
   -usuario: String
   -decisionTomada: String
-  -alternativaSeleccionada: UUID
+  -alternativaSeleccionada: Long
   +registrarDecision()
 }
 
@@ -122,21 +122,32 @@ RecomendacionDSS "1" --> "0..1" HistorialDecision
 
 note right of EvaluacionDSS
 HU-04:
-Calcula prioridad
-y evalúa criterios.
+Calcula prioridad y evalúa criterios.
+Pesos base congelados:
+- Urgencia: 30%
+- Riesgo de retraso: 25%
+- Eficiencia de distancia: 20%
+- Eficiencia de combustible: 15%
+- Disponibilidad/capacidad: 10%
+Total = 100%. Escala: 0 a 100.
 end note
 
 note right of AlternativaAsignacion
 HU-08:
-Compara alternativas,
-distancia, combustible
-y riesgo.
+Compara alternativas.
+Restricciones duras (exclusión previa):
+1. Conductor disponible
+2. Vehículo disponible
+3. Capacidad suficiente
+4. Pedido asignable
+Una alternativa que incumpla se excluye.
 end note
 
 note right of RecomendacionDSS
 HU-09:
-Genera una recomendación
-explicable.
+Genera recomendación explicable.
+La decisión final pertenece
+siempre al Responsable Logístico.
 end note
 
 @enduml
