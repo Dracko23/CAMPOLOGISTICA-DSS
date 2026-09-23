@@ -247,6 +247,17 @@ CAMPOLOGISTICA-DSS/
 
 ## 12. Enlaces del proyecto
 
+## Entorno de desarrollo (Incremento 0)
+
+1. Copiar `.env.example` como `.env` y reemplazar sus valores solo para el entorno local.
+2. Iniciar PostgreSQL 16 con `docker compose up -d`.
+3. Instalar `backend/requirements.txt` y ejecutar `uvicorn app.main:app --reload` desde `backend`.
+4. Ejecutar `npm ci` y `npm run dev` desde `frontend`.
+
+El backend expone `GET http://localhost:8000/health` y el frontend usa `http://localhost:5173`. Los esquemas `oltp` y `dw` serán creados mediante migraciones posteriores; este incremento no crea tablas ni datos de dominio.
+
+---
+
 **Repositorio:** CAMPOLOGISTICA-DSS
 
 **Documentación técnica:** `/docs`
