@@ -1,14 +1,18 @@
-import os
+import asyncio
 
-from fastapi.testclient import TestClient
-
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
-from app.main import app
-
-client = TestClient(app)
+import httpx
 
 
-def test_health() -> None:
-    response = client.get("/health")
+def test_health(migrated_database: None) -> None:
+    from app.main import app
+
+    async def request_health() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
+            return await client.get("/health")
+
+    response = asyncio.run(request_health())
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
