@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import re
+from types import SimpleNamespace
 from collections.abc import Iterator
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
 import psycopg
 import pytest
 from alembic import command
@@ -21,6 +24,33 @@ from app.core.config import get_settings
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SAFE_DATABASE_NAME = re.compile(r"^campo_logistica_test_[0-9a-f]{32}$")
+
+
+class ApiClient:
+    def __init__(self, app: object) -> None:
+        self.app = app
+
+    def request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
+        async def send() -> httpx.Response:
+            transport = httpx.ASGITransport(app=self.app)  # type: ignore[arg-type]
+            async with httpx.AsyncClient(
+                transport=transport, base_url='http://testserver'
+            ) as client:
+                return await client.request(method, url, **kwargs)
+
+        return asyncio.run(send())
+
+    def get(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request('GET', url, **kwargs)
+
+    def post(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request('POST', url, **kwargs)
+
+    def patch(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request('PATCH', url, **kwargs)
+
+    def delete(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request('DELETE', url, **kwargs)
 
 
 def _validated_admin_url() -> URL:
@@ -131,3 +161,22 @@ def db_session(pg_engine: Engine) -> Iterator[Session]:
         if outer_transaction.is_active:
             outer_transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def api_client(db_session: Session) -> Iterator[ApiClient]:
+    from app.db.session import get_db
+    from app.api.v1.auth import get_current_user
+    from app.main import app
+
+    def override_database() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_database
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id_usuario=1, rol="admin", activo=True, id_conductor=None, id_cliente=None
+    )
+    try:
+        yield ApiClient(app)
+    finally:
+        app.dependency_overrides.clear()

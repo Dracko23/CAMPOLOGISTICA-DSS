@@ -43,6 +43,8 @@ class Ubicacion(Base):
     )
     direccion: Mapped[str] = mapped_column(String(200), nullable=False)
     zona: Mapped[str] = mapped_column(String(80), nullable=False)
+    ciudad: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    departamento: Mapped[str | None] = mapped_column(String(100), nullable=True)
     latitud: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitud: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
 
@@ -184,6 +186,12 @@ class Asignacion(Base):
         DateTime(timezone=False), nullable=False
     )
     fecha_salida: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True
+    )
+    fecha_aceptacion: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True
+    )
+    fecha_llegada: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True
     )
     fecha_entrega: Mapped[datetime | None] = mapped_column(

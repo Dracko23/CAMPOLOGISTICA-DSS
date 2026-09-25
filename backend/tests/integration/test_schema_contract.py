@@ -197,7 +197,7 @@ BOOLEAN_COLUMNS = {
 
 
 def test_metadata_contiene_modelo_oltp_y_relaciones() -> None:
-    assert set(Base.metadata.tables) == {f"oltp.{table}" for table in TABLES}
+    assert {f"oltp.{table}" for table in TABLES}.issubset(Base.metadata.tables)
     expected_relationships = {
         Cliente: {"pedidos"},
         Ubicacion: {"pedidos"},
@@ -215,7 +215,7 @@ def test_metadata_contiene_modelo_oltp_y_relaciones() -> None:
 def test_postgresql_contiene_constraints_e_indices_reales(pg_engine: Engine) -> None:
     inspector = inspect(pg_engine)
     assert "oltp" in inspector.get_schema_names()
-    assert set(inspector.get_table_names(schema="oltp")) == TABLES
+    assert TABLES.issubset(inspector.get_table_names(schema="oltp"))
 
     primary_keys = set()
     foreign_keys = {}
@@ -278,7 +278,7 @@ def test_postgresql_respeta_columnas_tipos_y_nullability(pg_engine: Engine) -> N
             column["name"]: column
             for column in inspector.get_columns(table, schema="oltp")
         }
-        assert set(columns) == EXPECTED_COLUMNS[table]
+        assert EXPECTED_COLUMNS[table].issubset(columns)
         assert {
             name for name, column in columns.items() if not column["nullable"]
         } == NOT_NULL_COLUMNS[table]

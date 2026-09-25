@@ -23,6 +23,9 @@ EXPECTED_TABLE_KEYS = frozenset(
         "oltp.asignacion",
         "oltp.evaluacion_dss",
         "oltp.alternativa",
+        "oltp.usuario",
+        "oltp.ubicacion_vehiculo",
+        "oltp.evidencia_entrega",
     }
 )
 
@@ -33,7 +36,7 @@ def validate_target_metadata() -> None:
         missing = sorted(EXPECTED_TABLE_KEYS - actual_table_keys)
         unexpected = sorted(actual_table_keys - EXPECTED_TABLE_KEYS)
         raise RuntimeError(
-            "Alembic target metadata must contain exactly the eight OLTP tables; "
+            "Alembic target metadata must match the migrated OLTP tables; "
             f"missing={missing}, unexpected={unexpected}"
         )
 

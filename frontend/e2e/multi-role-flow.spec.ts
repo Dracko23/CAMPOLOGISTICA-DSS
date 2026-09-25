@@ -1,0 +1,19 @@
+import { expect, test } from '@playwright/test'
+
+const password='Demo1234!'
+async function login(page:import('@playwright/test').Page,email:string){await page.goto('/login');await page.getByLabel('Correo').fill(email);await page.getByLabel('Contraseña').fill(password);await page.getByRole('button',{name:/iniciar sesión/i}).click();await expect(page).not.toHaveURL(/login/)}
+async function logout(page:import('@playwright/test').Page){await page.getByRole('button',{name:/cerrar sesión/i}).click();await expect(page).toHaveURL(/login/)}
+async function selectText(select:import('@playwright/test').Locator,text:RegExp){await expect.poll(async()=>select.locator('option').allTextContents()).toEqual(expect.arrayContaining([expect.stringMatching(text)]));const options=await select.locator('option').evaluateAll(items=>items.map(item=>({text:item.textContent??'',value:(item as HTMLOptionElement).value})));const match=options.find(item=>text.test(item.text));await select.selectOption(match!.value)}
+
+test('flujo definitivo admin conductor cliente sobre el mismo pedido',async({page})=>{
+ const code=`E2E-${Date.now()}`
+ await page.route('https://nominatim.openstreetmap.org/reverse**',route=>route.fulfill({json:{lat:'-21.5355',lon:'-64.7296',display_name:'Av. Las Américas 145, Tarija',address:{suburb:'San Gerónimo',city:'Tarija',state:'Tarija'}}}))
+ await login(page,'admin.demo@campologistica.bo');await expect(page).toHaveURL(/\/app/)
+ await page.goto('/app/pedidos/nuevo');await selectText(page.getByLabel('Seleccionar cliente'),/Cliente DEMO Tarija/);await page.getByRole('button',{name:/continuar/i}).click()
+ await page.getByRole('button',{name:/seleccionar ubicación en mapa/i}).click();await page.locator('.leaflet-container').click({position:{x:210,y:180}});await expect(page.getByRole('button',{name:/confirmar ubicación/i})).toBeEnabled();await page.getByRole('button',{name:/confirmar ubicación/i}).click();await page.getByRole('button',{name:/continuar/i}).click()
+ await page.getByLabel(/código del pedido/i).fill(code);const future=new Date(Date.now()+86400000).toISOString().slice(0,16);await page.getByLabel(/fecha y hora límite/i).fill(future);await page.getByLabel(/peso de la carga/i).fill('100');await page.getByRole('button',{name:/continuar/i}).click();await page.getByRole('button',{name:/registrar pedido/i}).evaluate((el:HTMLButtonElement)=>el.click());await expect(page.getByRole('heading',{name:code})).toBeVisible()
+ await page.goto('/app/asignaciones');await page.getByRole('button',{name:/nueva asignación/i}).first().click();await selectText(page.getByRole('combobox',{name:'Pedido',exact:true}),new RegExp(code));await selectText(page.getByRole('combobox',{name:'Conductor',exact:true}),/Maria Vega DEMO/i);await selectText(page.getByRole('combobox',{name:/Vehículo/i}),/DMO-300/i);await page.getByRole('button',{name:/confirmar asignación/i}).click();await expect(page.getByText(code).first()).toBeVisible();await logout(page)
+ await login(page,'conductor3.demo@campologistica.bo');await expect(page.getByText(code)).toBeVisible();for(const action of [/aceptar entrega/i,/iniciar viaje/i,/llegué al destino/i,/confirmar entrega/i]){await page.getByRole('button',{name:action}).click();await expect(page.getByRole('button',{name:action})).toBeHidden()};await logout(page)
+ await login(page,'cliente1.demo@campologistica.bo');await expect(page.getByText(code)).toBeVisible();await page.getByRole('link',{name:/seguir entrega/i}).first().click();await expect(page.getByText('Entregado',{exact:true})).toBeVisible();await expect(page.getByText(/Av. Las Américas/i)).toBeVisible();await logout(page)
+ await login(page,'admin.demo@campologistica.bo');await page.goto('/app/pedidos');await page.getByPlaceholder(/código, cliente/i).fill(code);const row=page.getByRole('row').filter({hasText:code});await expect(row).toBeVisible();await expect(row.getByText(/entregado/i)).toBeVisible()
+})

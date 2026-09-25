@@ -8,6 +8,7 @@ from app.models.oltp import (
     Ubicacion,
     Vehiculo,
 )
+from app.models.auth_tracking import EvidenciaEntrega, UbicacionVehiculo, Usuario
 
 __all__ = [
     "Alternativa",
@@ -18,4 +19,7 @@ __all__ = [
     "Pedido",
     "Ubicacion",
     "Vehiculo",
+    "Usuario",
+    "UbicacionVehiculo",
+    "EvidenciaEntrega",
 ]
